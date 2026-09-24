@@ -13,7 +13,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2281" />
+        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2283" />
         <PackageReference Include="Soenneker.Utils.Directory" Version="4.0.945" />
         <PackageReference Include="Soenneker.Extensions.String" Version="4.0.762" />
         <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1461" />
