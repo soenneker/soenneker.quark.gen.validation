@@ -17,7 +17,7 @@
         <PackageReference Include="Soenneker.Utils.Directory" Version="4.0.945" />
         <PackageReference Include="Soenneker.Extensions.String" Version="4.0.762" />
         <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1461" />
-        <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.123" />
+        <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.124" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.12" />
