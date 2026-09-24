@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/.github/">
+    <File Path=".github/renovate.json" />
+  </Folder>
+  <Folder Name="/.github/workflows/">
+    <File Path=".github/workflows/build-and-test.yml" />
+    <File Path=".github/workflows/codeql.yml" />
+    <File Path=".github/workflows/publish-package.yml" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Soenneker.Quark.Gen.Validation/Soenneker.Quark.Gen.Validation.csproj" />
+    <Project Path="src/Soenneker.Quark.Gen.Validation.BuildTasks/Soenneker.Quark.Gen.Validation.BuildTasks.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Soenneker.Quark.Gen.Validation.Tests/Soenneker.Quark.Gen.Validation.Tests.csproj" />
+  </Folder>
+</Solution>

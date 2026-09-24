@@ -1,0 +1,30 @@
+<Project>
+  <PropertyGroup>
+    <ValidationBuildEnabled Condition="'$(ValidationBuildEnabled)' == ''">true</ValidationBuildEnabled>
+    <ValidationBuildTasksDllPath Condition="'$(ValidationBuildTasksDllPath)' == ''">$(MSBuildThisFileDirectory)Soenneker.Quark.Gen.Validation.BuildTasks.dll</ValidationBuildTasksDllPath>
+    <ValidationBuildTasksDllPath Condition="!Exists('$(ValidationBuildTasksDllPath)') and Exists('$(MSBuildThisFileDirectory)..\buildTransitive\Soenneker.Quark.Gen.Validation.BuildTasks.dll')">$(MSBuildThisFileDirectory)..\buildTransitive\Soenneker.Quark.Gen.Validation.BuildTasks.dll</ValidationBuildTasksDllPath>
+  </PropertyGroup>
+  <Target Name="GenerateQuarkValidation" BeforeTargets="CoreCompile" DependsOnTargets="ResolveReferences;GenerateMSBuildEditorConfigFile"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(ValidationBuildEnabled)' == 'true'">
+    <PropertyGroup>
+      <_QuarkValidationDirectory>$(IntermediateOutputPath)QuarkValidation/</_QuarkValidationDirectory>
+      <_QuarkValidationOutput>$([System.IO.Path]::GetFullPath('$(_QuarkValidationDirectory)Validation.g.cs'))</_QuarkValidationOutput>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(ValidationBuildTasksDllPath)')" Text="Quark validation executable was not found: $(ValidationBuildTasksDllPath)" />
+    <MakeDir Directories="$(_QuarkValidationDirectory)" />
+    <ItemGroup>
+      <Compile Remove="$(_QuarkValidationOutput)" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)sources.txt" Lines="@(Compile->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)references.txt" Lines="@(ReferencePath->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)defines.txt" Lines="$(DefineConstants)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)razor.txt" Lines="@(_RazorAnalyzer->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)additional.txt" Lines="@(AdditionalFiles->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)configs.txt" Lines="@(EditorConfigFiles->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <Exec Command="dotnet exec &quot;$(ValidationBuildTasksDllPath)&quot; --sources &quot;$(_QuarkValidationDirectory)sources.txt&quot; --references &quot;$(_QuarkValidationDirectory)references.txt&quot; --defines &quot;$(_QuarkValidationDirectory)defines.txt&quot; --razor &quot;$(_QuarkValidationDirectory)razor.txt&quot; --additional &quot;$(_QuarkValidationDirectory)additional.txt&quot; --configs &quot;$(_QuarkValidationDirectory)configs.txt&quot; --output &quot;$(_QuarkValidationOutput)&quot;" />
+    <ItemGroup>
+      <Compile Include="$(_QuarkValidationOutput)" />
+      <FileWrites Include="$(_QuarkValidationOutput);$(_QuarkValidationDirectory)*.txt" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <Platforms>AnyCPU</Platforms>
+        <NoWarn>$(NoWarn);1591;</NoWarn>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <DevelopmentDependency>true</DevelopmentDependency>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);AddBuildTasksOutputToPackage</TargetsForTfmSpecificContentInPackage>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Description>External build-time validation code generation for AOT-compatible Quark applications.</Description>
+        <Version Condition="'$(BUILD_VERSION)' == ''">4.0.1</Version>
+        <Version Condition="'$(BUILD_VERSION)' != ''">$(BUILD_VERSION)</Version>
+        <AssemblyName>Soenneker.Quark.Gen.Validation</AssemblyName>
+        <PackageId>Soenneker.Quark.Gen.Validation</PackageId>
+        <PackageTags>quark gen validation aot generator externalgenerator csharp dotnet c# .net</PackageTags>
+        <Copyright>Copyright © 2026 Jake Soenneker</Copyright>
+        <Authors>Jake Soenneker</Authors>
+        <Company>https://soenneker.com</Company>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <IsPackable>true</IsPackable>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/soenneker/soenneker.quark.gen.validation</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/soenneker/soenneker.quark.gen.validation</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <RepositoryBranch>main</RepositoryBranch>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageIcon>icon.png</PackageIcon>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+        <None Include="..\..\icon.png" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Soenneker.Quark.Gen.Validation.targets" Pack="true" PackagePath="build\" />
+        <None Include="Soenneker.Quark.Gen.Validation.targets" Pack="true" PackagePath="buildTransitive\" />
+
+    </ItemGroup>
+
+    <Target Name="BuildBuildTasksTool"
+            BeforeTargets="Pack"
+            Condition="'$(IsPackable)' == 'true'">
+
+        <MSBuild Projects="..\Soenneker.Quark.Gen.Validation.BuildTasks\Soenneker.Quark.Gen.Validation.BuildTasks.csproj"
+                 Targets="Build"
+                 Properties="Configuration=$(Configuration);NoBuild=false"
+                 RemoveProperties="TargetFramework;TargetFrameworks"
+                 BuildInParallel="true" />
+
+        <Error Condition="!Exists('..\Soenneker.Quark.Gen.Validation.BuildTasks\bin\$(Configuration)\Soenneker.Quark.Gen.Validation.BuildTasks.dll')"
+               Text="BuildTasks output missing. Aborting pack to avoid publishing a broken package." />
+    </Target>
+    <Target Name="AddBuildTasksOutputToPackage" DependsOnTargets="BuildBuildTasksTool">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="..\Soenneker.Quark.Gen.Validation.BuildTasks\bin\$(Configuration)\**\*.*"
+                                    PackagePath="buildTransitive/%(RecursiveDir)" />
+        </ItemGroup>
+    </Target>
+</Project>
