@@ -65,6 +65,12 @@ jobs:
       - name: Test
         run: dotnet test --project test/Soenneker.Quark.Gen.Validation.Tests/Soenneker.Quark.Gen.Validation.Tests.csproj --configuration Release --no-build --no-restore --verbosity normal
 
+      - name: Restore library
+        run: dotnet restore src/Soenneker.Quark.Gen.Validation/Soenneker.Quark.Gen.Validation.csproj --verbosity minimal
+
+      - name: Build library
+        run: dotnet build src/Soenneker.Quark.Gen.Validation/Soenneker.Quark.Gen.Validation.csproj --configuration Release --no-restore --verbosity minimal
+
       - name: Pack
         shell: bash
         run: |
