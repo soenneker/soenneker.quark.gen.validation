@@ -13,7 +13,7 @@ namespace Soenneker.Quark.Gen.Validation.Tests;
 public sealed class ValidationRunnerTests
 {
     [Test]
-    public async Task Manifests_generate_on_first_run_preserve_unchanged_output_and_remove_stale_validators()
+    public async ValueTask Manifests_generate_on_first_run_preserve_unchanged_output_and_remove_stale_validators()
     {
         var services = new ServiceCollection();
         services.AddLogging();

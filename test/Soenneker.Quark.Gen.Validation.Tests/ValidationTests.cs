@@ -10,7 +10,7 @@ namespace Soenneker.Quark.Gen.Validation.Tests;
 public sealed class ValidationTests
 {
     [Test]
-    public async Task Missing_arguments_return_failure()
+    public async ValueTask Missing_arguments_return_failure()
     {
         var services = new ServiceCollection();
         services.AddLogging();
