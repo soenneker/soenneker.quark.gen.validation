@@ -1,84 +1,60 @@
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.Loader;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Soenneker.Extensions.ValueTask;
-using Soenneker.Extensions.String;
-using Soenneker.Extensions.Enumerable.String;
-using Soenneker.Utils.File.Abstract;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
+using Soenneker.Utils.File.Abstract;
 
 namespace Soenneker.Quark.Gen.Validation.BuildTasks;
 
 internal static class RazorModelDiscovery
 {
-    internal static async ValueTask<CSharpCompilation> AddRazorModels(CSharpCompilation compilation, string[] analyzerPaths, string[] additionalPaths, string[] configPaths, CSharpParseOptions parseOptions, IFileUtil fileUtil, CancellationToken token)
+    internal static async ValueTask<CSharpCompilation> AddRazorModels(CSharpCompilation compilation, string[] analyzerPaths,
+        string[] additionalPaths, string[] configPaths, CSharpParseOptions parseOptions, IFileUtil fileUtil, CancellationToken token)
     {
-        if (analyzerPaths.Length == 0 || !additionalPaths.Any(p => p.EndsWithIgnoreCase(".razor"))) return compilation;
-        var directories = analyzerPaths.Select(Path.GetDirectoryName).Distinct().ToArray();
-        Assembly? Resolve(AssemblyLoadContext _, AssemblyName name)
-        {
-            foreach (var directory in directories)
-            {
-                var path = Path.Combine(directory!, name.Name + ".dll");
-                if (fileUtil.Exists(path, token).AwaitSyncSafe(token)) return AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
-            }
-            return null;
-        }
-        AssemblyLoadContext.Default.Resolving += Resolve;
+        if (analyzerPaths.Length == 0 || !additionalPaths.Any(path => path.EndsWith(".razor", StringComparison.OrdinalIgnoreCase)))
+            return compilation;
+
+        // The selected SDK's Razor generator must run in a managed host; the validation emitter remains native.
+        string helper = Path.Combine(AppContext.BaseDirectory, "razor", "Soenneker.Quark.Gen.Validation.RazorDiscovery.dll");
+        for (DirectoryInfo? parent = new DirectoryInfo(AppContext.BaseDirectory); !File.Exists(helper) && parent is not null; parent = parent.Parent)
+            helper = Path.Combine(parent.FullName, "artifacts", "native", RuntimeInformation.RuntimeIdentifier, "razor", "Soenneker.Quark.Gen.Validation.RazorDiscovery.dll");
+        if (!File.Exists(helper))
+            throw new InvalidOperationException("QV002: Razor discovery helper was not found: " + helper);
+
+        string directory = Path.Combine(Path.GetTempPath(), "quark-razor-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
         try
         {
-            var generators = analyzerPaths.Select(p => new AnalyzerFileReference(p, new Loader())).SelectMany(r => r.GetGenerators(LanguageNames.CSharp)).ToArray();
-            if (generators.Length == 0) throw new InvalidOperationException("QV002: The selected SDK's Razor generator could not be loaded.");
-            var configurationFiles = ImmutableArray.CreateBuilder<AnalyzerConfig>();
-            foreach (var path in configPaths)
+            var sourcePaths = compilation.SyntaxTrees.Select(tree => tree.FilePath);
+            await File.WriteAllLinesAsync(Path.Combine(directory, "sources.txt"), sourcePaths, token);
+            await File.WriteAllLinesAsync(Path.Combine(directory, "references.txt"), compilation.References.OfType<PortableExecutableReference>().Select(reference => reference.FilePath!), token);
+            await File.WriteAllLinesAsync(Path.Combine(directory, "defines.txt"), parseOptions.PreprocessorSymbolNames, token);
+            await File.WriteAllLinesAsync(Path.Combine(directory, "razor.txt"), analyzerPaths, token);
+            await File.WriteAllLinesAsync(Path.Combine(directory, "additional.txt"), additionalPaths, token);
+            await File.WriteAllLinesAsync(Path.Combine(directory, "configs.txt"), configPaths, token);
+            var start = new ProcessStartInfo("dotnet") { UseShellExecute = false };
+            start.ArgumentList.Add("exec");
+            start.ArgumentList.Add(helper);
+            start.ArgumentList.Add(directory);
+            using var process = Process.Start(start) ?? throw new InvalidOperationException("QV002: Could not start Razor discovery.");
+            try { await process.WaitForExitAsync(token); }
+            catch (OperationCanceledException)
             {
-                if (await fileUtil.Exists(path, token))
-                    configurationFiles.Add(AnalyzerConfig.Parse(SourceText.From(await fileUtil.Read(path, cancellationToken: token)), path));
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None);
+                throw;
             }
-            var configs = AnalyzerConfigSet.Create(configurationFiles.ToImmutable());
-            var additionalTexts = new List<AdditionalText>();
-            foreach (var path in additionalPaths)
-                additionalTexts.Add(new Additional(path, SourceText.From(await fileUtil.Read(path, cancellationToken: token))));
-            GeneratorDriver driver = CSharpGeneratorDriver.Create(generators, additionalTexts, parseOptions, new OptionsProvider(configs));
-            driver = driver.RunGenerators(compilation, token);
-            var result = driver.GetRunResult();
-            if (result.Results.Any(r => r.Exception is not null)) throw new InvalidOperationException("QV002: Razor model discovery failed: " + result.Results.Where(r => r.Exception is not null).Select(r => r.Exception!.Message).ToSeparatedString(';', includeSpace: true));
-            return compilation.AddSyntaxTrees(result.GeneratedTrees);
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException("QV002: Razor discovery failed with exit code " + process.ExitCode);
+            foreach (string path in Directory.GetFiles(directory, "generated-*.cs").OrderBy(path => path, StringComparer.Ordinal))
+                compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(await File.ReadAllTextAsync(path, token), parseOptions, path, cancellationToken: token));
+            return compilation;
         }
-        finally { AssemblyLoadContext.Default.Resolving -= Resolve; }
-    }
-
-    private sealed class Loader : IAnalyzerAssemblyLoader
-    {
-        public void AddDependencyLocation(string fullPath) { }
-        public Assembly LoadFromPath(string fullPath) => AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
-    }
-    private sealed class Additional(string path, SourceText text) : AdditionalText
-    {
-        public override string Path => path;
-        public override SourceText GetText(CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return text;
-        }
-    }
-    private sealed class Options(ImmutableDictionary<string, string> values) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value) => values.TryGetValue(key, out value!);
-    }
-    private sealed class OptionsProvider(AnalyzerConfigSet configs) : AnalyzerConfigOptionsProvider
-    {
-        public override AnalyzerConfigOptions GlobalOptions => new Options(configs.GlobalConfigOptions.AnalyzerOptions);
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => new Options(configs.GetOptionsForSourcePath(tree.FilePath).AnalyzerOptions);
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => new Options(configs.GetOptionsForSourcePath(textFile.Path).AnalyzerOptions);
+        finally { Directory.Delete(directory, recursive: true); }
     }
 }

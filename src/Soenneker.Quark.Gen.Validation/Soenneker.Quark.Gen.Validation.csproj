@@ -20,12 +20,12 @@
         <AssemblyName>Soenneker.Quark.Gen.Validation</AssemblyName>
         <PackageId>Soenneker.Quark.Gen.Validation</PackageId>
         <PackageTags>quark gen validation aot generator externalgenerator csharp dotnet c# .net</PackageTags>
-        <Copyright>Copyright © 2026 Jake Soenneker</Copyright>
+        <Copyright>Copyright Ã‚Â© 2026 Jake Soenneker</Copyright>
         <Authors>Jake Soenneker</Authors>
         <Company>https://soenneker.com</Company>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <IncludeSymbols>true</IncludeSymbols>
+        <IncludeSymbols>false</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <IsPackable>true</IsPackable>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -51,24 +51,34 @@
         <None Include="Soenneker.Quark.Gen.Validation.targets" Pack="true" PackagePath="buildTransitive\" />
 
     </ItemGroup>
+    <PropertyGroup>
+        <ValidationNativeRuntimeIdentifier Condition="'$(ValidationNativeRuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</ValidationNativeRuntimeIdentifier>
+        <ValidationNativeArtifactsDir Condition="'$(ValidationNativeArtifactsDir)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../artifacts/native'))</ValidationNativeArtifactsDir>
+        <_ValidationNativeExecutable>Soenneker.Quark.Gen.Validation.BuildTasks</_ValidationNativeExecutable>
+        <_ValidationNativeExecutable Condition="$([System.String]::Copy('$(ValidationNativeRuntimeIdentifier)').StartsWith('win-'))">$(_ValidationNativeExecutable).exe</_ValidationNativeExecutable>
+    </PropertyGroup>
 
-    <Target Name="BuildBuildTasksTool"
-            BeforeTargets="Pack"
-            Condition="'$(IsPackable)' == 'true'">
-
-        <MSBuild Projects="..\Soenneker.Quark.Gen.Validation.BuildTasks\Soenneker.Quark.Gen.Validation.BuildTasks.csproj"
-                 Targets="Build"
-                 Properties="Configuration=$(Configuration);NoBuild=false"
-                 RemoveProperties="TargetFramework;TargetFrameworks"
-                 BuildInParallel="true" />
-
-        <Error Condition="!Exists('..\Soenneker.Quark.Gen.Validation.BuildTasks\bin\$(Configuration)\Soenneker.Quark.Gen.Validation.BuildTasks.dll')"
-               Text="BuildTasks output missing. Aborting pack to avoid publishing a broken package." />
+    <Target Name="BuildBuildTasksTool" BeforeTargets="Build"
+            Condition="'$(ValidationUsePrebuiltNativeTools)' != 'true'"
+            Inputs="@(ValidationNativeSource);../Soenneker.Quark.Gen.Validation.BuildTasks/obj/project.assets.json"
+            Outputs="$(ValidationNativeArtifactsDir)/$(ValidationNativeRuntimeIdentifier)/$(_ValidationNativeExecutable)">
+        <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)/../Soenneker.Quark.Gen.Validation.BuildTasks/Soenneker.Quark.Gen.Validation.BuildTasks.csproj&quot; --configuration Release --runtime $(ValidationNativeRuntimeIdentifier) --output &quot;$(ValidationNativeArtifactsDir)/$(ValidationNativeRuntimeIdentifier)&quot;" />
     </Target>
+
+    <ItemGroup>
+        <ValidationNativeSource Include="../Soenneker.Quark.Gen.Validation.BuildTasks/**/*.cs;../Soenneker.Quark.Gen.Validation.BuildTasks/*.csproj;../Soenneker.Quark.Gen.Validation.RazorDiscovery/**/*.cs;../Soenneker.Quark.Gen.Validation.RazorDiscovery/*.csproj"
+                             Exclude="../Soenneker.Quark.Gen.Validation.BuildTasks/bin/**;../Soenneker.Quark.Gen.Validation.BuildTasks/obj/**;../Soenneker.Quark.Gen.Validation.RazorDiscovery/bin/**;../Soenneker.Quark.Gen.Validation.RazorDiscovery/obj/**" />
+    </ItemGroup>
+
     <Target Name="AddBuildTasksOutputToPackage" DependsOnTargets="BuildBuildTasksTool">
         <ItemGroup>
-            <TfmSpecificPackageFile Include="..\Soenneker.Quark.Gen.Validation.BuildTasks\bin\$(Configuration)\**\*.*"
-                                    PackagePath="buildTransitive/%(RecursiveDir)" />
+            <_ValidationRequiredRuntime Include="win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64" Condition="'$(ValidationUsePrebuiltNativeTools)' == 'true'" />
+            <_ValidationNativeFile Include="$(ValidationNativeArtifactsDir)/**/*"
+                                Exclude="$(ValidationNativeArtifactsDir)/**/*.pdb;$(ValidationNativeArtifactsDir)/**/*.dbg;$(ValidationNativeArtifactsDir)/**/*.dSYM/**" />
+            <TfmSpecificPackageFile Include="@(_ValidationNativeFile)" PackagePath="tools/native/" />
         </ItemGroup>
+        <Error Condition="'@(_ValidationRequiredRuntime)' != '' and !Exists('$(ValidationNativeArtifactsDir)/%(_ValidationRequiredRuntime.Identity)/Soenneker.Quark.Gen.Validation.BuildTasks') and !Exists('$(ValidationNativeArtifactsDir)/%(_ValidationRequiredRuntime.Identity)/Soenneker.Quark.Gen.Validation.BuildTasks.exe')"
+               Text="Missing native validation tool for %(_ValidationRequiredRuntime.Identity)." />
+        <Error Condition="'@(_ValidationNativeFile)' == ''" Text="Native validation tools are missing. Publish BuildTasks before packing." />
     </Target>
 </Project>

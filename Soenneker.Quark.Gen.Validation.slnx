@@ -10,6 +10,7 @@
   <Folder Name="/src/">
     <Project Path="src/Soenneker.Quark.Gen.Validation/Soenneker.Quark.Gen.Validation.csproj" />
     <Project Path="src/Soenneker.Quark.Gen.Validation.BuildTasks/Soenneker.Quark.Gen.Validation.BuildTasks.csproj" />
+    <Project Path="src/Soenneker.Quark.Gen.Validation.RazorDiscovery/Soenneker.Quark.Gen.Validation.RazorDiscovery.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Soenneker.Quark.Gen.Validation.Tests/Soenneker.Quark.Gen.Validation.Tests.csproj" />
