@@ -20,7 +20,7 @@
         <AssemblyName>Soenneker.Quark.Gen.Validation</AssemblyName>
         <PackageId>Soenneker.Quark.Gen.Validation</PackageId>
         <PackageTags>quark gen validation aot generator externalgenerator csharp dotnet c# .net</PackageTags>
-        <Copyright>Copyright Ã‚Â© 2026 Jake Soenneker</Copyright>
+        <Copyright>Copyright © 2026 Jake Soenneker</Copyright>
         <Authors>Jake Soenneker</Authors>
         <Company>https://soenneker.com</Company>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
