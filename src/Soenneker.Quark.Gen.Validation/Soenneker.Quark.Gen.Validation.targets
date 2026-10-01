@@ -11,7 +11,7 @@
 
     <ValidationBuildEnabled Condition="'$(ValidationBuildEnabled)' == ''">true</ValidationBuildEnabled>
   </PropertyGroup>
-  <Target Name="GenerateQuarkValidation" BeforeTargets="CoreCompile" DependsOnTargets="ResolveReferences;GenerateMSBuildEditorConfigFile"
+  <Target Name="_PrepareQuarkValidation" DependsOnTargets="ResolveReferences;GenerateMSBuildEditorConfigFile"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(ValidationBuildEnabled)' == 'true'">
     <PropertyGroup>
       <_QuarkValidationDirectory>$(IntermediateOutputPath)QuarkValidation/</_QuarkValidationDirectory>
@@ -28,9 +28,25 @@
     <WriteLinesToFile File="$(_QuarkValidationDirectory)razor.txt" Lines="@(_RazorAnalyzer->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)additional.txt" Lines="@(AdditionalFiles->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)configs.txt" Lines="@(EditorConfigFiles->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)tool.txt" Lines="$(ValidationBuildTasksExecutablePath)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <!-- Manifests also invalidate the cache when inputs are removed or compiler options change. -->
+    <ItemGroup>
+      <_QuarkValidationInputs Include="@(Compile);@(ReferencePath);@(_RazorAnalyzer);@(AdditionalFiles);@(EditorConfigFiles);$(MSBuildAllProjects);$(MSBuildProjectFullPath);$(_QuarkValidationDirectory)*.txt" />
+      <_QuarkValidationInputs Include="$([System.IO.Path]::GetDirectoryName('$(ValidationBuildTasksExecutablePath)'))/**/*" />
+      <FileWrites Include="$(_QuarkValidationOutput);$(_QuarkValidationDirectory)*.txt;$(_QuarkValidationDirectory)validation.stamp" />
+    </ItemGroup>
+    <Delete Files="$(_QuarkValidationDirectory)validation.stamp" Condition="!Exists('$(_QuarkValidationOutput)')" />
+  </Target>
+  <Target Name="_RunQuarkValidation" DependsOnTargets="_PrepareQuarkValidation"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(ValidationBuildEnabled)' == 'true'"
+          Inputs="@(_QuarkValidationInputs)" Outputs="$(_QuarkValidationDirectory)validation.stamp">
     <!-- NuGet extraction does not preserve Unix execute permissions. -->
     <Exec Condition="'$(OS)' != 'Windows_NT'" Command="chmod +x &quot;$(ValidationBuildTasksExecutablePath)&quot;" />
     <Exec Command="&quot;$(ValidationBuildTasksExecutablePath)&quot; --sources &quot;$(_QuarkValidationDirectory)sources.txt&quot; --references &quot;$(_QuarkValidationDirectory)references.txt&quot; --defines &quot;$(_QuarkValidationDirectory)defines.txt&quot; --razor &quot;$(_QuarkValidationDirectory)razor.txt&quot; --additional &quot;$(_QuarkValidationDirectory)additional.txt&quot; --configs &quot;$(_QuarkValidationDirectory)configs.txt&quot; --output &quot;$(_QuarkValidationOutput)&quot;" />
+    <Touch Files="$(_QuarkValidationDirectory)validation.stamp" AlwaysCreate="true" />
+  </Target>
+  <Target Name="GenerateQuarkValidation" BeforeTargets="CoreCompile" DependsOnTargets="_RunQuarkValidation"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(ValidationBuildEnabled)' == 'true'">
     <ItemGroup>
       <Compile Include="$(_QuarkValidationOutput)" />
       <FileWrites Include="$(_QuarkValidationOutput);$(_QuarkValidationDirectory)*.txt" />
