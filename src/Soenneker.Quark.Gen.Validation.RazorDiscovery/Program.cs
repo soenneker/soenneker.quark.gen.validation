@@ -52,7 +52,7 @@ internal static class Program
                             log: false));
                     try
                     {
-                        (await tree.GetTextAsync()).Write(writer);
+                        (await tree.GetTextAsync().NoSync()).Write(writer);
                     }
                     finally
                     {

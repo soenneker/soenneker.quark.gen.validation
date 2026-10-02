@@ -53,8 +53,7 @@ public sealed class ValidationEmitter
                     semantic ??= compilation.GetSemanticModel(tree);
                     if (semantic.GetDeclaredSymbol(declaration) is not INamedTypeSymbol type || !seen.Add(type)) continue;
                     IPropertySymbol[] properties = Properties(type).ToArray();
-                    if (!type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == "Soenneker.Quark.GenerateQuarkValidationAttribute") &&
-                        !properties.Any(p => Attributes(p).Any(IsValidation))) continue;
+                    if (!HasValidation(type, properties)) continue;
                     if (type.IsStatic || type.IsRefLikeType || type.IsFileLocal || type.TypeKind is not (TypeKind.Class or TypeKind.Struct))
                         throw Error(type, "Validation models must be ordinary classes, records, or structs.");
                     var chain = new Stack<INamedTypeSymbol>();
@@ -119,10 +118,25 @@ public sealed class ValidationEmitter
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         for (INamedTypeSymbol? current = type; current is not null; current = current.BaseType)
-            foreach (IPropertySymbol property in current.GetMembers().OfType<IPropertySymbol>())
-                if (names.Add(property.Name) && !property.IsStatic && !property.IsIndexer && property.DeclaredAccessibility == Accessibility.Public &&
+            foreach (ISymbol member in current.GetMembers())
+                if (member is IPropertySymbol property && names.Add(property.Name) && !property.IsStatic && !property.IsIndexer && property.DeclaredAccessibility == Accessibility.Public &&
                     property.GetMethod?.DeclaredAccessibility == Accessibility.Public)
                     yield return property;
+    }
+
+    private bool HasValidation(INamedTypeSymbol type, IPropertySymbol[] properties)
+    {
+        foreach (AttributeData attribute in type.GetAttributes())
+            if (attribute.AttributeClass is { Name: "GenerateQuarkValidationAttribute" } attributeType &&
+                Name(attributeType) == "Soenneker.Quark.GenerateQuarkValidationAttribute")
+                return true;
+
+        foreach (IPropertySymbol property in properties)
+            foreach (AttributeData attribute in Attributes(property))
+                if (IsValidation(attribute))
+                    return true;
+
+        return false;
     }
 
     private ImmutableArray<AttributeData> Attributes(IPropertySymbol property)
@@ -185,11 +199,11 @@ public sealed class ValidationEmitter
         ref PooledStringBuilder fields, ref int fieldIndex, ref bool usesTypedRange, ref bool usesComparison)
     {
         ImmutableArray<AttributeData> allAttributes = Attributes(property);
-        var attributes = new List<AttributeData>(allAttributes.Length);
+        List<AttributeData>? attributes = null;
         foreach (AttributeData attribute in allAttributes)
-            if (IsValidation(attribute) && IsRequired(attribute)) attributes.Add(attribute);
+            if (IsValidation(attribute) && IsRequired(attribute)) (attributes ??= new List<AttributeData>(allAttributes.Length)).Add(attribute);
         foreach (AttributeData attribute in allAttributes)
-            if (IsValidation(attribute) && !IsRequired(attribute)) attributes.Add(attribute);
+            if (IsValidation(attribute) && !IsRequired(attribute)) (attributes ??= new List<AttributeData>(allAttributes.Length)).Add(attribute);
         output.Append("case ");
         output.Append(Literal(property.Name));
         output.AppendLine(": {");
@@ -199,7 +213,7 @@ public sealed class ValidationEmitter
         output.Append(property.Name);
         output.AppendLine(";");
 
-        if (attributes.Count != 0)
+        if (attributes is { Count: > 0 })
         {
             string display = Display(property);
             string displayExpression = display;
