@@ -15,6 +15,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.131" />
+        <PackageReference Include="Soenneker.Utils.PooledStringBuilders" Version="4.0.34" />
+        <PackageReference Include="Soenneker.Utils.Dotnet" Version="4.0.2620" />
         <PackageReference Include="Soenneker.Utils.File" Version="4.0.2292" />
         <PackageReference Include="Soenneker.Utils.Directory" Version="4.0.949" />
         <PackageReference Include="Soenneker.Extensions.String" Version="4.0.770" />

@@ -1,5 +1,5 @@
 // This source is appended to the consuming compilation only when a typed range is used.
-using System;
+
 namespace Soenneker.Quark.Gen.Validation.BuildTasks;
 internal static class TypedRangeSource
 {
@@ -20,6 +20,13 @@ internal sealed class TypedRangeAttribute<T> : global::System.ComponentModel.Dat
   var order = min.CompareTo(max);
   if (order > 0 || (order == 0 && (MinimumIsExclusive || MaximumIsExclusive))) throw new global::System.InvalidOperationException("Invalid range limits.");
   _minimum = min; _maximum = max;
+ }
+ internal bool IsValidTyped(T value) {
+  EnsureLimits();
+  var comparer = global::System.Collections.Generic.Comparer<T>.Default;
+  var lower = comparer.Compare((T)_minimum!, value);
+  var upper = comparer.Compare((T)_maximum!, value);
+  return (MinimumIsExclusive ? lower < 0 : lower <= 0) && (MaximumIsExclusive ? upper > 0 : upper >= 0);
  }
  public override bool IsValid(object? value) {
   EnsureLimits();

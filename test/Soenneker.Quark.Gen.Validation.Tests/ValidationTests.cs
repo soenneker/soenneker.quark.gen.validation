@@ -1,3 +1,4 @@
+using Soenneker.Extensions.ValueTask;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,12 +16,26 @@ public sealed class ValidationTests
         var services = new ServiceCollection();
         services.AddLogging();
         Startup.ConfigureServices(services);
-        await using ServiceProvider provider = services.BuildServiceProvider();
-        await using AsyncServiceScope scope = provider.CreateAsyncScope();
-        var runner = scope.ServiceProvider.GetRequiredService<IValidationWriteRunner>();
+        ServiceProvider provider = services.BuildServiceProvider();
+        try
+        {
+            AsyncServiceScope scope = provider.CreateAsyncScope();
+            try
+            {
+                var runner = scope.ServiceProvider.GetRequiredService<IValidationWriteRunner>();
 
-        int exitCode = await runner.Run([], CancellationToken.None);
-        if (exitCode != 1)
-            throw new InvalidOperationException($"Expected missing arguments to fail, got exit code {exitCode}.");
+                int exitCode = await runner.Run([], CancellationToken.None).NoSync();
+                if (exitCode != 1)
+                    throw new InvalidOperationException($"Expected missing arguments to fail, got exit code {exitCode}.");
+            }
+            finally
+            {
+                await scope.DisposeAsync().NoSync();
+            }
+        }
+        finally
+        {
+            await provider.DisposeAsync().NoSync();
+        }
     }
 }

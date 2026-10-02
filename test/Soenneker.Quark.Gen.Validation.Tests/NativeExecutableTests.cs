@@ -1,5 +1,12 @@
+using Soenneker.Extensions.ValueTask;
+using Soenneker.Extensions.Task;
 using System;
-using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Soenneker.Quark.Gen.Validation.BuildTasks;
+using Soenneker.Utils.File.Abstract;
+using Soenneker.Utils.Directory.Abstract;
+using Soenneker.Utils.Process.Abstract;
+using Soenneker.Utils.Dotnet.Abstract;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,70 +21,101 @@ public sealed class NativeExecutableTests
         // Native matrix jobs supply the published executable; ordinary managed test runs do not.
         string? executable = Environment.GetEnvironmentVariable("QUARK_NATIVE_TOOL");
         if (string.IsNullOrEmpty(executable)) { TUnit.Core.Skip.Test("Set QUARK_NATIVE_TOOL to run native integration tests."); return; }
-        string directory = Path.Combine(Path.GetTempPath(), "quark native " + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        Startup.ConfigureServices(services);
+        ServiceProvider provider = services.BuildServiceProvider();
         try
         {
-            string source = Path.Combine(directory, "Model.cs");
-            await File.WriteAllTextAsync(source, "namespace Soenneker.Quark { public interface IGeneratedQuarkValidation { void ValidateField(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results); } [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class GenerateQuarkValidationAttribute : System.Attribute {} } [Soenneker.Quark.GenerateQuarkValidation] public partial class Model { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } }");
-            string sources = Path.Combine(directory, "sources.txt");
-            string references = Path.Combine(directory, "references.txt");
-            await File.WriteAllLinesAsync(sources, [source]);
-            await File.WriteAllLinesAsync(references, ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator));
-            string output = Path.Combine(directory, "Validation.g.cs");
-            string[] arguments = ["--sources", sources, "--references", references, "--output", output];
-            string[] expectedValues = ["RequiredAttribute", "IGeneratedQuarkValidation"];
-            async Task Run()
+            var fileUtil = provider.GetRequiredService<IFileUtil>();
+            var directoryUtil = provider.GetRequiredService<IDirectoryUtil>();
+            string directory = Path.Combine(Path.GetTempPath(), "quark native " + Guid.NewGuid().ToString("N"));
+            await directoryUtil.Create(directory).NoSync();
+            try
             {
-                var start = new ProcessStartInfo(executable) { UseShellExecute = false };
-                foreach (string argument in arguments) start.ArgumentList.Add(argument);
-                using var process = Process.Start(start) ?? throw new Exception("Native tool could not start.");
-                await process.WaitForExitAsync();
-                if (process.ExitCode != 0) throw new Exception("Native tool failed: " + process.ExitCode);
+                string source = Path.Combine(directory, "Model.cs");
+                await fileUtil.Write(source, "namespace Soenneker.Quark { public interface IGeneratedQuarkValidation { void ValidateField(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results); } [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class GenerateQuarkValidationAttribute : System.Attribute {} } [Soenneker.Quark.GenerateQuarkValidation] public partial class Model { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } }").NoSync();
+                string sources = Path.Combine(directory, "sources.txt");
+                string references = Path.Combine(directory, "references.txt");
+                await fileUtil.WriteAllLines(sources, [source]).NoSync();
+                await fileUtil.WriteAllLines(references, ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)).NoSync();
+                string output = Path.Combine(directory, "Validation.g.cs");
+                string[] arguments = ["--sources", sources, "--references", references, "--output", output];
+                string[] expectedValues = ["RequiredAttribute", "IGeneratedQuarkValidation"];
+                async Task Run()
+                {
+                    await provider.GetRequiredService<IProcessUtil>().Start(executable,
+                        arguments: string.Join(" ", arguments.Select(CommandLineArguments.Quote))).NoSync();
+                }
+                await Run().NoSync();
+                string content = await fileUtil.Read(output).NoSync();
+                foreach (string expected in expectedValues)
+                    if (!content.Contains(expected, StringComparison.Ordinal)) throw new Exception("Native output is missing " + expected);
+                DateTime timestamp = File.GetLastWriteTimeUtc(output);
+                await Run().NoSync();
+                if (File.GetLastWriteTimeUtc(output) != timestamp) throw new Exception("Unchanged native output was rewritten.");
             }
-            await Run();
-            string content = await File.ReadAllTextAsync(output);
-            foreach (string expected in expectedValues)
-                if (!content.Contains(expected, StringComparison.Ordinal)) throw new Exception("Native output is missing " + expected);
-            DateTime timestamp = File.GetLastWriteTimeUtc(output);
-            await Run();
-            if (File.GetLastWriteTimeUtc(output) != timestamp) throw new Exception("Unchanged native output was rewritten.");
+            finally { await directoryUtil.Delete(directory).NoSync(); }
         }
-        finally { Directory.Delete(directory, recursive: true); }
+        finally
+        {
+            await provider.DisposeAsync().NoSync();
+        }
     }
     [Test]
     public async Task Native_executable_discovers_nested_models_from_the_selected_SDK_Razor_generator()
     {
         string? executable = Environment.GetEnvironmentVariable("QUARK_NATIVE_TOOL");
         if (string.IsNullOrEmpty(executable)) { TUnit.Core.Skip.Test("Set QUARK_NATIVE_TOOL to run native integration tests."); return; }
-        string? targets = null;
-        for (DirectoryInfo? parent = new FileInfo(executable).Directory; parent is not null; parent = parent.Parent)
-        {
-            string candidate = Path.Combine(parent.FullName, "src", "Soenneker.Quark.Gen.Validation", "Soenneker.Quark.Gen.Validation.targets");
-            if (File.Exists(candidate)) { targets = candidate; break; }
-        }
-        if (targets is null) throw new Exception("Validation targets could not be found.");
-        string directory = Path.Combine(Path.GetTempPath(), "quark native razor " + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        var services = new ServiceCollection();
+        services.AddLogging();
+        Startup.ConfigureServices(services);
+        ServiceProvider provider = services.BuildServiceProvider();
         try
         {
-            string project = Path.Combine(directory, "Fixture.csproj");
-            await File.WriteAllTextAsync(project, "<Project Sdk=\"Microsoft.NET.Sdk.Razor\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><RootNamespace>NativeRazorFixture</RootNamespace><ValidationBuildTasksExecutablePath>" + System.Security.SecurityElement.Escape(executable) + "</ValidationBuildTasksExecutablePath></PropertyGroup><ItemGroup><FrameworkReference Include=\"Microsoft.AspNetCore.App\" /></ItemGroup><Import Project=\"" + System.Security.SecurityElement.Escape(targets) + "\" /></Project>");
-            await File.WriteAllTextAsync(Path.Combine(directory, "Contract.cs"), "namespace Soenneker.Quark { public interface IGeneratedQuarkValidation { void ValidateField(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results); } [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class GenerateQuarkValidationAttribute : System.Attribute {} }");
-            await File.WriteAllTextAsync(Path.Combine(directory, "Component.razor"), "<p>Native Razor</p>\n@code { [Soenneker.Quark.GenerateQuarkValidation] public partial class EmbeddedModel { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = \"\"; } }");
-            var start = new ProcessStartInfo("dotnet") { UseShellExecute = false };
-            start.ArgumentList.Add("build");
-            start.ArgumentList.Add(project);
-            start.ArgumentList.Add("--verbosity");
-            start.ArgumentList.Add("quiet");
-            using var process = Process.Start(start) ?? throw new Exception("Razor fixture build could not start.");
-            await process.WaitForExitAsync();
-            if (process.ExitCode != 0) throw new Exception("Native Razor fixture failed: " + process.ExitCode);
-            string output = Directory.GetFiles(Path.Combine(directory, "obj"), "Validation.g.cs", SearchOption.AllDirectories).Single();
-            string content = await File.ReadAllTextAsync(output);
-            if (!content.Contains("EmbeddedModel", StringComparison.Ordinal) || !content.Contains("RequiredAttribute", StringComparison.Ordinal))
-                throw new Exception("Native validation did not discover the nested Razor model.");
+            var fileUtil = provider.GetRequiredService<IFileUtil>();
+            var directoryUtil = provider.GetRequiredService<IDirectoryUtil>();
+            string? targets = null;
+            for (DirectoryInfo? parent = new FileInfo(executable).Directory; parent is not null; parent = parent.Parent)
+            {
+                string candidate = Path.Combine(parent.FullName, "src", "Soenneker.Quark.Gen.Validation", "Soenneker.Quark.Gen.Validation.targets");
+                if (await fileUtil.Exists(candidate).NoSync()) { targets = candidate; break; }
+            }
+            if (targets is null) throw new Exception("Validation targets could not be found.");
+            string directory = Path.Combine(Path.GetTempPath(), "quark native razor " + Guid.NewGuid().ToString("N"));
+            await directoryUtil.Create(directory).NoSync();
+            try
+            {
+                string project = Path.Combine(directory, "Fixture.csproj");
+                await fileUtil.Write(project, "<Project Sdk=\"Microsoft.NET.Sdk.Razor\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><RootNamespace>NativeRazorFixture</RootNamespace><ValidationBuildTasksExecutablePath>" + System.Security.SecurityElement.Escape(executable) + "</ValidationBuildTasksExecutablePath></PropertyGroup><ItemGroup><FrameworkReference Include=\"Microsoft.AspNetCore.App\" /></ItemGroup><Import Project=\"" + System.Security.SecurityElement.Escape(targets) + "\" /></Project>").NoSync();
+                await fileUtil.Write(Path.Combine(directory, "Contract.cs"), "namespace Soenneker.Quark { public interface IGeneratedQuarkValidation { void ValidateField(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results); } [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class GenerateQuarkValidationAttribute : System.Attribute {} }").NoSync();
+                await fileUtil.Write(Path.Combine(directory, "Component.razor"), "<p>Native Razor</p>\n@code { [Soenneker.Quark.GenerateQuarkValidation] public partial class EmbeddedModel { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = \"\"; } }").NoSync();
+                if (!await provider.GetRequiredService<IDotnetUtil>().Build(project, configuration: "Debug", verbosity: "quiet").NoSync())
+                    throw new Exception("Native Razor fixture failed.");
+                string output = (await directoryUtil.GetFilesByExtension(Path.Combine(directory, "obj"), ".cs", recursive: true).NoSync())
+                    .Single(path => Path.GetFileName(path) == "Validation.g.cs");
+                string content = await fileUtil.Read(output).NoSync();
+                if (!content.Contains("EmbeddedModel", StringComparison.Ordinal) || !content.Contains("RequiredAttribute", StringComparison.Ordinal))
+                    throw new Exception("Native validation did not discover the nested Razor model.");
+                string stamp = Path.Combine(Path.GetDirectoryName(output)!, "validation.stamp");
+                DateTime stampTime = File.GetLastWriteTimeUtc(stamp);
+                DateTime outputTime = File.GetLastWriteTimeUtc(output);
+                if (!await provider.GetRequiredService<IDotnetUtil>().Build(project, configuration: "Debug", verbosity: "quiet").NoSync())
+                    throw new Exception("Incremental Razor build failed.");
+                if (File.GetLastWriteTimeUtc(stamp) != stampTime || File.GetLastWriteTimeUtc(output) != outputTime)
+                    throw new Exception("An unchanged build reran validation generation.");
+                await fileUtil.Write(Path.Combine(directory, "Component.razor"), "<p>Native Razor</p>\n@code { [Soenneker.Quark.GenerateQuarkValidation] public partial class EmbeddedModel { [System.ComponentModel.DataAnnotations.Required] public string Changed { get; set; } = \"\"; } }").NoSync();
+                if (!await provider.GetRequiredService<IDotnetUtil>().Build(project, configuration: "Debug", verbosity: "quiet").NoSync())
+                    throw new Exception("Changed Razor build failed.");
+                content = await fileUtil.Read(output).NoSync();
+                if (!content.Contains("case \"Changed\"", StringComparison.Ordinal) || content.Contains("case \"Name\"", StringComparison.Ordinal))
+                    throw new Exception("Razor changes did not invalidate generated validation.");
+            }
+            finally { await directoryUtil.Delete(directory).NoSync(); }
         }
-        finally { Directory.Delete(directory, recursive: true); }
+        finally
+        {
+            await provider.DisposeAsync().NoSync();
+        }
     }
 }

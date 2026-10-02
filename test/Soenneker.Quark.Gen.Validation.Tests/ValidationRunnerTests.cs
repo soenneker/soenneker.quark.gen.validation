@@ -1,3 +1,5 @@
+using Soenneker.Extensions.ValueTask;
+using Soenneker.Extensions.Task;
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Soenneker.Utils.File.Abstract;
@@ -18,32 +20,39 @@ public sealed class ValidationRunnerTests
         var services = new ServiceCollection();
         services.AddLogging();
         Startup.ConfigureServices(services);
-        await using var provider = services.BuildServiceProvider();
-        var fileUtil = provider.GetRequiredService<IFileUtil>();
-        var directoryUtil = provider.GetRequiredService<IDirectoryUtil>();
-        var directory = Path.Combine(Path.GetTempPath(), "quark validation " + Guid.NewGuid().ToString("N"));
-        await directoryUtil.Create(directory);
+        ServiceProvider provider = services.BuildServiceProvider();
         try
         {
-            var source = Path.Combine(directory, "Model.cs");
-            var sources = Path.Combine(directory, "sources.txt");
-            var references = Path.Combine(directory, "references.txt");
-            var defines = Path.Combine(directory, "defines.txt");
-            var output = Path.Combine(directory, "Validation.g.cs");
-            await fileUtil.Write(source, "#if ENABLE_VALIDATION\npublic partial class Model { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } }\n#endif");
-            await fileUtil.WriteAllLines(sources, [source, output]);
-            await fileUtil.WriteAllLines(references, ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator));
-            await fileUtil.WriteAllLines(defines, ["ENABLE_VALIDATION"]);
-            var args = new[] { "--sources", sources, "--references", references, "--defines", defines, "--output", output };
-            var runner = provider.GetRequiredService<IValidationWriteRunner>();
-            if (await runner.Run(args, CancellationToken.None) != 0 || !(await fileUtil.Read(output)).Contains("RequiredAttribute")) throw new Exception("First generation failed.");
-            var timestamp = File.GetLastWriteTimeUtc(output);
-            if (await runner.Run(args, CancellationToken.None) != 0 || File.GetLastWriteTimeUtc(output) != timestamp) throw new Exception("Unchanged output was rewritten.");
-            using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
-            try { await runner.Run(args, cancellation.Token); throw new Exception("Cancellation ignored."); } catch (OperationCanceledException) { }
-            await fileUtil.Write(defines, "");
-            if (await runner.Run(args, CancellationToken.None) != 0 || (await fileUtil.Read(output)).Contains("RequiredAttribute")) throw new Exception("Stale validator remained.");
+            var fileUtil = provider.GetRequiredService<IFileUtil>();
+            var directoryUtil = provider.GetRequiredService<IDirectoryUtil>();
+            string directory = Path.Combine(Path.GetTempPath(), "quark validation " + Guid.NewGuid().ToString("N"));
+            await directoryUtil.Create(directory).NoSync();
+            try
+            {
+                string source = Path.Combine(directory, "Model.cs");
+                string sources = Path.Combine(directory, "sources.txt");
+                string references = Path.Combine(directory, "references.txt");
+                string defines = Path.Combine(directory, "defines.txt");
+                string output = Path.Combine(directory, "Validation.g.cs");
+                await fileUtil.Write(source, "#if ENABLE_VALIDATION\npublic partial class Model { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } }\n#endif").NoSync();
+                await fileUtil.WriteAllLines(sources, [source, output]).NoSync();
+                await fileUtil.WriteAllLines(references, ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)).NoSync();
+                await fileUtil.WriteAllLines(defines, ["ENABLE_VALIDATION"]).NoSync();
+                string[] args = new[] { "--sources", sources, "--references", references, "--defines", defines, "--output", output };
+                var runner = provider.GetRequiredService<IValidationWriteRunner>();
+                if (await runner.Run(args, CancellationToken.None).NoSync() != 0 || !(await fileUtil.Read(output).NoSync()).Contains("RequiredAttribute")) throw new Exception("First generation failed.");
+                DateTime timestamp = File.GetLastWriteTimeUtc(output);
+                if (await runner.Run(args, CancellationToken.None).NoSync() != 0 || File.GetLastWriteTimeUtc(output) != timestamp) throw new Exception("Unchanged output was rewritten.");
+                using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+                try { await runner.Run(args, cancellation.Token).NoSync(); throw new Exception("Cancellation ignored."); } catch (OperationCanceledException) { }
+                await fileUtil.Write(defines, "").NoSync();
+                if (await runner.Run(args, CancellationToken.None).NoSync() != 0 || (await fileUtil.Read(output).NoSync()).Contains("RequiredAttribute")) throw new Exception("Stale validator remained.");
+            }
+            finally { await directoryUtil.Delete(directory).NoSync(); }
         }
-        finally { await directoryUtil.Delete(directory); }
+        finally
+        {
+            await provider.DisposeAsync().NoSync();
+        }
     }
 }

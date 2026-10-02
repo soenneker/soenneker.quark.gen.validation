@@ -3,10 +3,9 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using Soenneker.Quark.Gen.Validation.BuildTasks;
 
 namespace Soenneker.Quark.Gen.Validation.Tests;
@@ -20,7 +19,7 @@ public interface IGeneratedQuarkValidation { void ValidateField(string memberNam
 public sealed class GenerateQuarkValidationAttribute : System.Attribute { }
 }
 """;
-    private static CSharpCompilation Compile(string source) => CSharpCompilation.Create("ValidationParity" + Guid.NewGuid().ToString("N"),
+    internal static CSharpCompilation Compile(string source) => CSharpCompilation.Create("ValidationParity" + Guid.NewGuid().ToString("N"),
         new[] { CSharpSyntaxTree.ParseText(source + Contract, new CSharpParseOptions(LanguageVersion.Preview)) },
         ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator).Select(p => MetadataReference.CreateFromFile(p)),
         new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
@@ -53,6 +52,11 @@ public sealed partial class Model : BaseModel, IValidatableObject {
  [CustomValidation(typeof(Model), nameof(Check)), CustomValidation(typeof(Model), nameof(CheckOther))] public string Multiple { get; set; } = "bad";
  [Required, Display(Name = "")] public string EmptyDisplay { get; set; } = "";
  [Odd] public int OddValue { get; set; } = 2;
+ [Base64String] public string Base64 { get; set; } = "invalid";
+ [FileExtensions(Extensions = "png,jpg")] public string File { get; set; } = "document.txt";
+ [EnumDataType(typeof(DayOfWeek))] public int Day { get; set; } = 20;
+ [AllowedValues("one", "two")] public string Allowed { get; set; } = "three";
+ [DeniedValues("one", "two")] public string Denied { get; set; } = "one";
  public override string Inherited { get; set; } = "";
  public string NoAttributes { get; set; } = "";
  public static ValidationResult? Check(string value, ValidationContext context) => value == "good" ? null : new ValidationResult(context.MemberName + " failed", new[] { "Custom" });
@@ -116,19 +120,19 @@ public partial class Scenario {
     public void Generated_output_is_deterministic()
     {
         // Emitter output must be stable independent of process-specific identities.
-        var compilation = Compile("public partial class Model { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } }");
+        CSharpCompilation compilation = Compile("public partial class Model { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } }");
         if (ValidationEmitter.Emit(compilation) != ValidationEmitter.Emit(compilation)) throw new Exception("Nondeterministic output");
     }
 
-    private static void Run(string source)
+    internal static void Run(string source)
     {
-        var compilation = Compile(source);
-        var generated = ValidationEmitter.Emit(compilation);
+        CSharpCompilation compilation = Compile(source);
+        string generated = ValidationEmitter.Emit(compilation);
         compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(generated, new CSharpParseOptions(LanguageVersion.Preview)));
         using var stream = new MemoryStream();
-        var result = compilation.Emit(stream);
+        EmitResult result = compilation.Emit(stream);
         if (!result.Success) throw new Exception(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToSeparatedString('\n') + "\n" + generated);
-        var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+        Assembly assembly = System.Reflection.Assembly.Load(stream.ToArray());
         try { assembly.GetType("Scenario")!.GetMethod("Run")!.Invoke(null, null); }
         catch (TargetInvocationException exception) { throw exception.InnerException!; }
     }
