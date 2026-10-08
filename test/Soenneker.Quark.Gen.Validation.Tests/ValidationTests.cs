@@ -11,7 +11,7 @@ namespace Soenneker.Quark.Gen.Validation.Tests;
 public sealed class ValidationTests
 {
     [Test]
-    public async ValueTask Missing_arguments_return_failure()
+    public async ValueTask Missing_arguments_return_failure(CancellationToken cancellationToken)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -24,7 +24,7 @@ public sealed class ValidationTests
             {
                 var runner = scope.ServiceProvider.GetRequiredService<IValidationWriteRunner>();
 
-                int exitCode = await runner.Run([], CancellationToken.None).NoSync();
+                int exitCode = await runner.Run([], cancellationToken).NoSync();
                 if (exitCode != 1)
                     throw new InvalidOperationException($"Expected missing arguments to fail, got exit code {exitCode}.");
             }
