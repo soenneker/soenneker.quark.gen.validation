@@ -6,12 +6,12 @@
         <IsPackable>false</IsPackable>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.125" />
-        <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.132" />
+        <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.126" />
+        <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.133" />
         <Compile Include="../Soenneker.Quark.Gen.Validation.BuildTasks/CompilationInput.cs" Link="CompilationInput.cs" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
-        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2292" />
-        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1475" />
+        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2299" />
+        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1476" />
     </ItemGroup>
 </Project>

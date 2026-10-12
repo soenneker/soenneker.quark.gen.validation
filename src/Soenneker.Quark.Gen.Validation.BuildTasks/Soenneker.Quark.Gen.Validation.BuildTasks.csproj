@@ -15,12 +15,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.132" />
+        <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.133" />
         <PackageReference Include="Soenneker.Utils.PooledStringBuilders" Version="4.0.35" />
-        <PackageReference Include="Soenneker.Utils.Dotnet" Version="4.0.2621" />
-        <PackageReference Include="Soenneker.Extensions.String" Version="4.0.775" />
-        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1475" />
-        <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.125" />
+        <PackageReference Include="Soenneker.Utils.Dotnet" Version="4.0.2632" />
+        <PackageReference Include="Soenneker.Extensions.String" Version="4.0.777" />
+        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1476" />
+        <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.126" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.12" />
