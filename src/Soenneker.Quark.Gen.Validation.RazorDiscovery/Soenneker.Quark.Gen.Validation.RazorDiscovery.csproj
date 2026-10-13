@@ -7,7 +7,7 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.126" />
-        <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.133" />
+        <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.134" />
         <Compile Include="../Soenneker.Quark.Gen.Validation.BuildTasks/CompilationInput.cs" Link="CompilationInput.cs" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
