@@ -10,7 +10,7 @@
     <ItemGroup>
         <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.132" />
         <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.139" />
-        <PackageReference Include="Soenneker.Tests.Unit" Version="4.0.1392" />
+        <PackageReference Include="Soenneker.Tests.Unit" Version="4.0.1394" />
         <PackageReference Include="TUnit" Version="1.75.0" />
     </ItemGroup>
 
