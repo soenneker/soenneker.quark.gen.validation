@@ -1,7 +1,7 @@
 using Soenneker.Extensions.ValueTask;
 using Soenneker.Extensions.Task;
 using System;
-using Soenneker.Utils.Dotnet.Abstract;
+using Soenneker.Utils.Process.Abstract;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -16,7 +16,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Soenneker.Quark.Gen.Validation.BuildTasks;
 
-public sealed class ValidationWriteRunner(IFileUtil fileUtil, IDirectoryUtil directoryUtil, IDotnetUtil dotnetUtil)
+public sealed class ValidationWriteRunner(IFileUtil fileUtil, IDirectoryUtil directoryUtil, IProcessUtil processUtil)
     : Abstract.IValidationWriteRunner
 {
     public async ValueTask<int> Run(string[] args, CancellationToken cancellationToken)
@@ -80,7 +80,7 @@ public sealed class ValidationWriteRunner(IFileUtil fileUtil, IDirectoryUtil dir
                 string[] additional = await Manifest("--additional").NoSync();
                 if (additional.Any(path => path.EndsWith(".razor", StringComparison.OrdinalIgnoreCase)))
                     compilation = await RazorModelDiscovery.AddRazorModels(compilation, analyzers, additional,
-                        await Manifest("--configs").NoSync(), parseOptions, fileUtil, directoryUtil, dotnetUtil,
+                        await Manifest("--configs").NoSync(), Required("--sdk"), parseOptions, fileUtil, directoryUtil, processUtil,
                         cancellationToken).NoSync();
             }
 
@@ -106,7 +106,7 @@ public sealed class ValidationWriteRunner(IFileUtil fileUtil, IDirectoryUtil dir
         {
             if (i + 1 >= args.Length ||
                 args[i] is not ("--sources" or "--references" or "--output" or "--defines" or "--razor"
-                    or "--additional" or "--configs") || !map.TryAdd(args[i], args[i + 1]))
+                    or "--additional" or "--configs" or "--sdk") || !map.TryAdd(args[i], args[i + 1]))
                 throw new ArgumentException("Invalid or duplicate argument: " + args[i]);
         }
 

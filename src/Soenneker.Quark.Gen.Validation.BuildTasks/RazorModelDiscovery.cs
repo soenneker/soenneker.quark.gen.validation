@@ -3,7 +3,7 @@ using Soenneker.Extensions.Task;
 using System;
 using System.Collections.Generic;
 using Soenneker.Utils.Directory.Abstract;
-using Soenneker.Utils.Dotnet.Abstract;
+using Soenneker.Utils.Process.Abstract;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -18,12 +18,22 @@ namespace Soenneker.Quark.Gen.Validation.BuildTasks;
 internal static class RazorModelDiscovery
 {
     internal static async ValueTask<CSharpCompilation> AddRazorModels(CSharpCompilation compilation, string[] analyzerPaths,
-        string[] additionalPaths, string[] configPaths, CSharpParseOptions parseOptions, IFileUtil fileUtil, IDirectoryUtil directoryUtil, IDotnetUtil dotnetUtil, CancellationToken token)
+        string[] additionalPaths, string[] configPaths, string sdkDirectory, CSharpParseOptions parseOptions, IFileUtil fileUtil, IDirectoryUtil directoryUtil, IProcessUtil processUtil, CancellationToken token)
     {
         if (analyzerPaths.Length == 0 || !additionalPaths.Any(path => path.EndsWith(".razor", StringComparison.OrdinalIgnoreCase)))
             return compilation;
 
-        // The selected SDK's Razor generator must run in a managed host; the validation emitter remains native.
+        string compilerDirectory = Path.Combine(Path.GetFullPath(sdkDirectory), "Roslyn", "bincore");
+        string dotnetHost = Path.GetFullPath(Path.Combine(sdkDirectory, "..", "..", OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet"));
+        string runtimeConfig = Path.Combine(compilerDirectory, "csc.runtimeconfig.json");
+        string dependencies = Path.Combine(compilerDirectory, "csc.deps.json");
+        foreach (string required in new[] { dotnetHost, runtimeConfig, dependencies, Path.Combine(compilerDirectory, "Microsoft.CodeAnalysis.dll"), Path.Combine(compilerDirectory, "Microsoft.CodeAnalysis.CSharp.dll") })
+        {
+            if (!await fileUtil.Exists(required, token).NoSync())
+                throw new InvalidOperationException("QV002: Selected SDK compiler file was not found: " + required);
+        }
+
+        // Use the SDK's runtime and dependency graph, never the helper's build-time Roslyn version.
         string helper = Path.Combine(AppContext.BaseDirectory, "razor", "Soenneker.Quark.Gen.Validation.RazorDiscovery.dll");
         for (var parent = new DirectoryInfo(AppContext.BaseDirectory); !await fileUtil.Exists(helper, token).NoSync() && parent is not null; parent = parent.Parent)
             helper = Path.Combine(parent.FullName, "artifacts", "native", RuntimeInformation.RuntimeIdentifier, "razor", "Soenneker.Quark.Gen.Validation.RazorDiscovery.dll");
@@ -42,11 +52,14 @@ internal static class RazorModelDiscovery
             await fileUtil.WriteAllLines(Path.Combine(directory, "configs.txt"), configPaths, cancellationToken: token).NoSync();
             try
             {
-                await dotnetUtil.Execute("exec " + CommandLineArguments.Quote(helper) + " " + CommandLineArguments.Quote(directory), token).NoSync();
+                await processUtil.Start(dotnetHost, arguments: "exec --runtimeconfig " + CommandLineArguments.Quote(runtimeConfig) +
+                    " --depsfile " + CommandLineArguments.Quote(dependencies) + " " + CommandLineArguments.Quote(helper) +
+                    " " + CommandLineArguments.Quote(directory) + " " + CommandLineArguments.Quote(Path.GetFullPath(sdkDirectory)),
+                    log: false, cancellationToken: token).NoSync();
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                throw new InvalidOperationException("QV002: Razor discovery failed: " + exception.Message, exception);
+                throw new InvalidOperationException("QV002: Razor discovery failed using SDK " + sdkDirectory + ": " + exception.Message, exception);
             }
             List<string> paths = await directoryUtil.GetFilesByExtension(directory, ".cs", cancellationToken: token).NoSync();
             paths.RemoveAll(path => !Path.GetFileName(path).StartsWith("generated-", StringComparison.Ordinal));

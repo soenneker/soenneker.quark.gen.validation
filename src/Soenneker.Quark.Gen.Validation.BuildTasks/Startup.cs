@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using Soenneker.Utils.Dotnet.Registrars;
+using Soenneker.Utils.Process.Registrars;
 using Soenneker.Utils.File.Registrars;
 using Soenneker.Utils.Directory.Registrars;
 using Soenneker.Quark.Gen.Validation.BuildTasks.Abstract;
@@ -12,7 +12,7 @@ public static class Startup
     {
         services.AddFileUtilAsSingleton();
         services.AddDirectoryUtilAsSingleton();
-        services.AddDotnetUtilAsSingleton();
+        services.AddProcessUtilAsSingleton();
         services.AddSingleton<IValidationWriteRunner, ValidationWriteRunner>();
     }
 }
