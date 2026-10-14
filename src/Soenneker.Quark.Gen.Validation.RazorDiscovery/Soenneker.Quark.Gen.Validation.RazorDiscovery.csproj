@@ -11,7 +11,7 @@
         <Compile Include="../Soenneker.Quark.Gen.Validation.BuildTasks/CompilationInput.cs" Link="CompilationInput.cs" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.13" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
-        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2314" />
-        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1490" />
+        <PackageReference Include="Soenneker.Utils.File" Version="4.0.2315" />
+        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1491" />
     </ItemGroup>
 </Project>

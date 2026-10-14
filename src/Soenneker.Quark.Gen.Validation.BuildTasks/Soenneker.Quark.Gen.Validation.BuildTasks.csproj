@@ -17,9 +17,9 @@
     <ItemGroup>
         <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.139" />
         <PackageReference Include="Soenneker.Utils.PooledStringBuilders" Version="4.0.42" />
-        <PackageReference Include="Soenneker.Utils.Dotnet" Version="4.0.2650" />
-        <PackageReference Include="Soenneker.Extensions.String" Version="4.0.790" />
-        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1490" />
+        <PackageReference Include="Soenneker.Utils.Dotnet" Version="4.0.2651" />
+        <PackageReference Include="Soenneker.Extensions.String" Version="4.0.791" />
+        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1491" />
         <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.132" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
