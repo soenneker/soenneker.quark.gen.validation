@@ -86,36 +86,14 @@ public sealed class NativeExecutableTests
             await directoryUtil.Create(directory, cancellationToken: cancellationToken).NoSync();
             try
             {
-                string? sdkVersion = Environment.GetEnvironmentVariable("QUARK_TEST_SDK");
-                if (!string.IsNullOrWhiteSpace(sdkVersion))
-                    await fileUtil.Write(Path.Combine(directory, "global.json"),
-                        System.Text.Json.JsonSerializer.Serialize(new { sdk = new { version = sdkVersion, rollForward = "disable", allowPrerelease = true } }),
-                        cancellationToken: cancellationToken).NoSync();
                 async Task BuildFixture()
                 {
-                    var start = new System.Diagnostics.ProcessStartInfo("dotnet")
-                    {
-                        WorkingDirectory = directory,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-                    foreach (string argument in new[] { "build", "Fixture.csproj", "--configuration", "Debug", "--verbosity", "quiet" })
-                        start.ArgumentList.Add(argument);
-                    // dotnet test exports its own SDK paths; the fixture must select its SDK independently.
-                    foreach (string key in start.Environment.Keys.Where(key => key.StartsWith("MSBUILD", StringComparison.OrdinalIgnoreCase) ||
-                                 key.StartsWith("DOTNET_MSBUILD", StringComparison.OrdinalIgnoreCase)).ToArray())
-                        start.Environment.Remove(key);
-                    using var process = System.Diagnostics.Process.Start(start)!;
-                    Task<string> stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
-                    Task<string> stderr = process.StandardError.ReadToEndAsync(cancellationToken);
-                    await process.WaitForExitAsync(cancellationToken);
-                    string output = await stdout + await stderr;
-                    if (process.ExitCode != 0)
-                        throw new Exception("Razor fixture build failed: " + output);
+                    await provider.GetRequiredService<IProcessUtil>().Start("dotnet", workingDirectory: directory,
+                        arguments: "build Fixture.csproj --configuration Debug --verbosity quiet",
+                        cancellationToken: cancellationToken).NoSync();
                 }
                 string project = Path.Combine(directory, "Fixture.csproj");
-                await fileUtil.Write(project, "<Project Sdk=\"Microsoft.NET.Sdk.Razor\"><PropertyGroup><TargetFramework>net11.0</TargetFramework><RootNamespace>NativeRazorFixture</RootNamespace><ValidationBuildTasksExecutablePath>" + System.Security.SecurityElement.Escape(executable) + "</ValidationBuildTasksExecutablePath></PropertyGroup><ItemGroup><FrameworkReference Include=\"Microsoft.AspNetCore.App\" /></ItemGroup><Import Project=\"" + System.Security.SecurityElement.Escape(targets) + "\" /></Project>", cancellationToken: cancellationToken).NoSync();
+                await fileUtil.Write(project, "<Project Sdk=\"Microsoft.NET.Sdk.Razor\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><RootNamespace>NativeRazorFixture</RootNamespace><ValidationBuildTasksExecutablePath>" + System.Security.SecurityElement.Escape(executable) + "</ValidationBuildTasksExecutablePath></PropertyGroup><ItemGroup><FrameworkReference Include=\"Microsoft.AspNetCore.App\" /></ItemGroup><Import Project=\"" + System.Security.SecurityElement.Escape(targets) + "\" /></Project>", cancellationToken: cancellationToken).NoSync();
                 await fileUtil.Write(Path.Combine(directory, "Contract.cs"), "namespace Soenneker.Quark { public interface IGeneratedQuarkValidation { void ValidateField(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results); } [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class GenerateQuarkValidationAttribute : System.Attribute {} }", cancellationToken: cancellationToken).NoSync();
                 await fileUtil.Write(Path.Combine(directory, "Component.razor"), "<p>Native Razor</p>\n@code { [Soenneker.Quark.GenerateQuarkValidation] public partial class EmbeddedModel { [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = \"\"; } }", cancellationToken: cancellationToken).NoSync();
                 await BuildFixture().NoSync();
