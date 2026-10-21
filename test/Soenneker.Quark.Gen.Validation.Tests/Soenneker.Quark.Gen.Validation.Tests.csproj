@@ -11,7 +11,7 @@
         <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.133" />
         <PackageReference Include="Soenneker.Extensions.Task" Version="4.0.140" />
         <PackageReference Include="Soenneker.Tests.Unit" Version="4.0.1398" />
-        <PackageReference Include="TUnit" Version="1.75.0" />
+        <PackageReference Include="TUnit" Version="1.76.0" />
     </ItemGroup>
 
     <ItemGroup>
