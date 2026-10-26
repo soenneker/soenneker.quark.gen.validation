@@ -20,7 +20,7 @@
         <PackageReference Include="Soenneker.Utils.Process" Version="4.0.1598" />
         <PackageReference Include="Soenneker.Utils.File" Version="4.0.2319" />
         <PackageReference Include="Soenneker.Utils.Directory" Version="4.0.967" />
-        <PackageReference Include="Soenneker.Extensions.String" Version="4.0.799" />
+        <PackageReference Include="Soenneker.Extensions.String" Version="4.0.800" />
         <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="4.0.1497" />
         <PackageReference Include="Soenneker.Extensions.ValueTask" Version="4.0.133" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
