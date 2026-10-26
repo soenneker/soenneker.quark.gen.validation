@@ -18,7 +18,7 @@
         <PackageReference Include="Soenneker.Extensions.Task" Version="11.0.141" />
         <PackageReference Include="Soenneker.Utils.PooledStringBuilders" Version="11.0.44" />
         <PackageReference Include="Soenneker.Utils.Process" Version="11.0.1602" />
-        <PackageReference Include="Soenneker.Utils.File" Version="11.0.2325" />
+        <PackageReference Include="Soenneker.Utils.File" Version="11.0.2326" />
         <PackageReference Include="Soenneker.Utils.Directory" Version="11.0.970" />
         <PackageReference Include="Soenneker.Extensions.String" Version="4.0.800" />
         <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="11.0.1501" />
