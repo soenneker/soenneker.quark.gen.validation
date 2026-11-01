@@ -20,6 +20,9 @@ internal static class DiscoveryRunner
 
         var options = new CSharpParseOptions(LanguageVersion.Preview,
             preprocessorSymbols: await Manifest("defines"));
+        if (File.Exists(Path.Combine(directory, "features.txt")))
+            options = options.WithFeatures((await Manifest("features")).Select(f => f.Split('=', 2))
+                .Select(f => new System.Collections.Generic.KeyValuePair<string, string>(f[0], f.Length == 2 ? f[1] : "true")));
         string[] sources = await Manifest("sources");
         var trees = new SyntaxTree[sources.Length];
         await Parallel.ForAsync(0, sources.Length,

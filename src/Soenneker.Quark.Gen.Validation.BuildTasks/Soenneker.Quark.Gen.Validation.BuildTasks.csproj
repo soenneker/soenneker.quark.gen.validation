@@ -28,6 +28,15 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0-rc.3.26522.148" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="11.0.0-rc.3.26522.148" />
     </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../Soenneker.Quark.Gen.Validation.RazorDiscovery/Soenneker.Quark.Gen.Validation.RazorDiscovery.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+    <Target Name="CopyRazorDiscovery" AfterTargets="Build">
+        <ItemGroup>
+            <_RazorDiscoveryOutput Include="$(MSBuildProjectDirectory)/../Soenneker.Quark.Gen.Validation.RazorDiscovery/bin/$(Configuration)/net11.0/**/*" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_RazorDiscoveryOutput)" DestinationFiles="@(_RazorDiscoveryOutput->'$(TargetDir)razor/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    </Target>
     <Target Name="PublishRazorDiscovery" AfterTargets="Publish">
         <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)/../Soenneker.Quark.Gen.Validation.RazorDiscovery/Soenneker.Quark.Gen.Validation.RazorDiscovery.csproj&quot; --configuration $(Configuration) --output &quot;$(PublishDir)razor&quot; --property:PublishAot=false --property:RuntimeIdentifier= --property:SelfContained=false" />
     </Target>

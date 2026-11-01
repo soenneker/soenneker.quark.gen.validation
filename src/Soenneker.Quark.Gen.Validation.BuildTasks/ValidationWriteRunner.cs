@@ -39,6 +39,12 @@ public sealed class ValidationWriteRunner(IFileUtil fileUtil, IDirectoryUtil dir
                 : [];
             var parseOptions = new CSharpParseOptions(LanguageVersion.Preview,
                 preprocessorSymbols: defines.ExceptNullOrWhiteSpace());
+            if (map.TryGetValue("--features", out string? featuresPath))
+            {
+                var features = await fileUtil.ReadAsLines(featuresPath, cancellationToken: cancellationToken).NoSync();
+                parseOptions = parseOptions.WithFeatures(features.Where(f => !string.IsNullOrWhiteSpace(f))
+                    .Select(f => f.Split('=', 2)).Select(f => new KeyValuePair<string, string>(f[0], f.Length == 2 ? f[1] : "true")));
+            }
             StringComparer pathComparer =
                 OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
             var uniquePaths = new HashSet<string>(sourcePaths.Count, pathComparer);
@@ -84,6 +90,25 @@ public sealed class ValidationWriteRunner(IFileUtil fileUtil, IDirectoryUtil dir
                         cancellationToken).NoSync();
             }
 
+            if (map.TryGetValue("--razor-output", out string? razorOutput))
+            {
+                razorOutput = Path.GetFullPath(razorOutput);
+                await directoryUtil.Create(razorOutput, cancellationToken: cancellationToken).NoSync();
+                var generatedPaths = new List<string>();
+                foreach (SyntaxTree tree in compilation.SyntaxTrees.Except(trees))
+                {
+                    string generatedPath = Path.Combine(razorOutput, "Razor-" + generatedPaths.Count + ".g.cs");
+                    string generated = RazorBindingRewriter.Rewrite(compilation, tree).GetText(cancellationToken).ToString();
+                    if (!await GeneratedFile.Matches(generatedPath, generated, fileUtil, cancellationToken).NoSync())
+                        await fileUtil.WriteAtomically(generatedPath, generated, cancellationToken: cancellationToken).NoSync();
+                    generatedPaths.Add(generatedPath);
+                }
+                string manifest = string.Join(Environment.NewLine, generatedPaths);
+                string manifestPath = Path.Combine(razorOutput, "sources.txt");
+                if (!await GeneratedFile.Matches(manifestPath, manifest, fileUtil, cancellationToken).NoSync())
+                    await fileUtil.WriteAtomically(manifestPath, manifest, cancellationToken: cancellationToken).NoSync();
+            }
+
             string output = ValidationEmitter.Emit(compilation, cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             await directoryUtil.Create(Path.GetDirectoryName(outputPath)!, cancellationToken: cancellationToken)
@@ -106,7 +131,7 @@ public sealed class ValidationWriteRunner(IFileUtil fileUtil, IDirectoryUtil dir
         {
             if (i + 1 >= args.Length ||
                 args[i] is not ("--sources" or "--references" or "--output" or "--defines" or "--razor"
-                    or "--additional" or "--configs" or "--sdk") || !map.TryAdd(args[i], args[i + 1]))
+                    or "--additional" or "--configs" or "--sdk" or "--razor-output" or "--features") || !map.TryAdd(args[i], args[i + 1]))
                 throw new ArgumentException("Invalid or duplicate argument: " + args[i]);
         }
 

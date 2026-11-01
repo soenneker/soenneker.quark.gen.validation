@@ -70,6 +70,9 @@ internal static class RazorModelDiscovery
             if (result.Results.Any(r => r.Exception is not null))
                 throw new InvalidOperationException("QV002: Razor model discovery failed: " + string.Join("; ",
                     result.Results.Where(r => r.Exception is not null).Select(r => r.Exception!.ToString())));
+            var errors = result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+            if (errors.Length != 0)
+                throw new InvalidOperationException("QV002: Razor generation failed: " + string.Join("; ", errors.Select(d => d.ToString())));
             return result.GeneratedTrees;
         }
         finally

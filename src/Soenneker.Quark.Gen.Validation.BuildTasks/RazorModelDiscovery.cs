@@ -47,6 +47,7 @@ internal static class RazorModelDiscovery
             await fileUtil.WriteAllLines(Path.Combine(directory, "sources.txt"), sourcePaths, cancellationToken: token).NoSync();
             await fileUtil.WriteAllLines(Path.Combine(directory, "references.txt"), compilation.References.OfType<PortableExecutableReference>().Select(reference => reference.FilePath!), cancellationToken: token).NoSync();
             await fileUtil.WriteAllLines(Path.Combine(directory, "defines.txt"), parseOptions.PreprocessorSymbolNames, cancellationToken: token).NoSync();
+            await fileUtil.WriteAllLines(Path.Combine(directory, "features.txt"), parseOptions.Features.Select(f => f.Key + "=" + f.Value), cancellationToken: token).NoSync();
             await fileUtil.WriteAllLines(Path.Combine(directory, "razor.txt"), analyzerPaths, cancellationToken: token).NoSync();
             await fileUtil.WriteAllLines(Path.Combine(directory, "additional.txt"), additionalPaths, cancellationToken: token).NoSync();
             await fileUtil.WriteAllLines(Path.Combine(directory, "configs.txt"), configPaths, cancellationToken: token).NoSync();

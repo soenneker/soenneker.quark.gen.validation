@@ -15,42 +15,61 @@
           Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(ValidationBuildEnabled)' == 'true'">
     <PropertyGroup>
       <_QuarkValidationDirectory>$(IntermediateOutputPath)QuarkValidation/</_QuarkValidationDirectory>
+      <_QuarkValidationRazorDirectory>$([System.IO.Path]::GetFullPath('$(_QuarkValidationDirectory)Razor'))</_QuarkValidationRazorDirectory>
       <_QuarkValidationOutput>$([System.IO.Path]::GetFullPath('$(_QuarkValidationDirectory)Validation.g.cs'))</_QuarkValidationOutput>
       <!-- MSBuildSDKsPath can point at Visual Studio's SDK resolver directory instead. -->
       <_QuarkValidationSdkDirectory>$([System.IO.Path]::GetFullPath('$(NetCoreRoot)sdk/$(NETCoreSdkVersion)'))</_QuarkValidationSdkDirectory>
     </PropertyGroup>
-    <Error Condition="!Exists('$(ValidationBuildTasksExecutablePath)')" Text="Quark validation executable was not found: $(ValidationBuildTasksExecutablePath)" />
+    <Error Condition="'$(ValidationBuildTasksDllPath)' == '' and !Exists('$(ValidationBuildTasksExecutablePath)')" Text="Quark validation executable was not found: $(ValidationBuildTasksExecutablePath)" />
     <MakeDir Directories="$(_QuarkValidationDirectory)" />
     <ItemGroup>
-      <Compile Remove="$(_QuarkValidationOutput)" />
+      <Compile Remove="$(_QuarkValidationOutput);$(_QuarkValidationRazorDirectory)/**/*.g.cs" />
     </ItemGroup>
     <WriteLinesToFile File="$(_QuarkValidationDirectory)sources.txt" Lines="@(Compile->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)references.txt" Lines="@(ReferencePath->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)features.txt" Lines="$(Features)" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)defines.txt" Lines="$(DefineConstants)" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)razor.txt" Lines="@(_RazorAnalyzer->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)additional.txt" Lines="@(AdditionalFiles->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)configs.txt" Lines="@(EditorConfigFiles->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
-    <WriteLinesToFile File="$(_QuarkValidationDirectory)tool.txt" Lines="$(ValidationBuildTasksExecutablePath)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_QuarkValidationDirectory)tool.txt" Lines="$(ValidationBuildTasksExecutablePath);$(ValidationBuildTasksDllPath)" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <WriteLinesToFile File="$(_QuarkValidationDirectory)sdk.txt" Lines="$(_QuarkValidationSdkDirectory)" Overwrite="true" WriteOnlyWhenDifferent="true" />
     <!-- Manifests also invalidate the cache when inputs are removed or compiler options change. -->
     <ItemGroup>
       <_QuarkValidationInputs Include="@(Compile);@(ReferencePath);@(_RazorAnalyzer);@(AdditionalFiles);@(EditorConfigFiles);$(MSBuildAllProjects);$(MSBuildProjectFullPath);$(_QuarkValidationDirectory)*.txt" />
       <_QuarkValidationInputs Include="$([System.IO.Path]::GetDirectoryName('$(ValidationBuildTasksExecutablePath)'))/**/*" />
+      <_QuarkValidationInputs Include="$(ValidationBuildTasksDllPath)" Condition="'$(ValidationBuildTasksDllPath)' != ''" />
+      <_QuarkValidationInputs Include="$([System.IO.Path]::GetDirectoryName('$(ValidationBuildTasksDllPath)'))/razor/**/*" Condition="'$(ValidationBuildTasksDllPath)' != ''" />
       <FileWrites Include="$(_QuarkValidationOutput);$(_QuarkValidationDirectory)*.txt;$(_QuarkValidationDirectory)validation.stamp" />
     </ItemGroup>
-    <Delete Files="$(_QuarkValidationDirectory)validation.stamp" Condition="!Exists('$(_QuarkValidationOutput)')" />
+    <Delete Files="$(_QuarkValidationDirectory)validation.stamp" Condition="!Exists('$(_QuarkValidationOutput)') or !Exists('$(_QuarkValidationRazorDirectory)/sources.txt')" />
+    <ReadLinesFromFile File="$(_QuarkValidationRazorDirectory)/sources.txt" Condition="Exists('$(_QuarkValidationRazorDirectory)/sources.txt')">
+      <Output TaskParameter="Lines" ItemName="_PreviousQuarkRazorOutput" />
+    </ReadLinesFromFile>
+    <Delete Files="$(_QuarkValidationDirectory)validation.stamp" Condition="'@(_PreviousQuarkRazorOutput)' != '' and !Exists('%(_PreviousQuarkRazorOutput.Identity)')" />
   </Target>
   <Target Name="_RunQuarkValidation" DependsOnTargets="_PrepareQuarkValidation"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(ValidationBuildEnabled)' == 'true'"
           Inputs="@(_QuarkValidationInputs)" Outputs="$(_QuarkValidationDirectory)validation.stamp">
     <!-- NuGet extraction does not preserve Unix execute permissions. -->
-    <Exec Condition="'$(OS)' != 'Windows_NT'" Command="chmod +x &quot;$(ValidationBuildTasksExecutablePath)&quot;" />
-    <Exec Command="&quot;$(ValidationBuildTasksExecutablePath)&quot; --sdk &quot;$(_QuarkValidationSdkDirectory)&quot; --sources &quot;$(_QuarkValidationDirectory)sources.txt&quot; --references &quot;$(_QuarkValidationDirectory)references.txt&quot; --defines &quot;$(_QuarkValidationDirectory)defines.txt&quot; --razor &quot;$(_QuarkValidationDirectory)razor.txt&quot; --additional &quot;$(_QuarkValidationDirectory)additional.txt&quot; --configs &quot;$(_QuarkValidationDirectory)configs.txt&quot; --output &quot;$(_QuarkValidationOutput)&quot;" />
+    <Exec Condition="'$(OS)' != 'Windows_NT' and '$(ValidationBuildTasksDllPath)' == ''" Command="chmod +x &quot;$(ValidationBuildTasksExecutablePath)&quot;" />
+    <PropertyGroup>
+      <_QuarkValidationCommand>&quot;$(ValidationBuildTasksExecutablePath)&quot;</_QuarkValidationCommand>
+      <_QuarkValidationCommand Condition="'$(ValidationBuildTasksDllPath)' != ''">dotnet &quot;$(ValidationBuildTasksDllPath)&quot;</_QuarkValidationCommand>
+    </PropertyGroup>
+    <Exec Command="$(_QuarkValidationCommand) --sdk &quot;$(_QuarkValidationSdkDirectory)&quot; --sources &quot;$(_QuarkValidationDirectory)sources.txt&quot; --references &quot;$(_QuarkValidationDirectory)references.txt&quot; --defines &quot;$(_QuarkValidationDirectory)defines.txt&quot; --features &quot;$(_QuarkValidationDirectory)features.txt&quot; --razor &quot;$(_QuarkValidationDirectory)razor.txt&quot; --additional &quot;$(_QuarkValidationDirectory)additional.txt&quot; --configs &quot;$(_QuarkValidationDirectory)configs.txt&quot; --output &quot;$(_QuarkValidationOutput)&quot; --razor-output &quot;$(_QuarkValidationRazorDirectory)&quot;" />
     <Touch Files="$(_QuarkValidationDirectory)validation.stamp" AlwaysCreate="true" />
   </Target>
   <Target Name="GenerateQuarkValidation" BeforeTargets="CoreCompile" DependsOnTargets="_RunQuarkValidation"
           Condition="'$(DesignTimeBuild)' != 'true' and '$(IsCrossTargetingBuild)' != 'true' and '$(ValidationBuildEnabled)' == 'true'">
+    <ReadLinesFromFile File="$(_QuarkValidationRazorDirectory)/sources.txt">
+      <Output TaskParameter="Lines" ItemName="_QuarkGeneratedRazor" />
+    </ReadLinesFromFile>
     <ItemGroup>
+      <!-- Discovery already ran the SDK Razor generator. Compile its rewritten output once. -->
+      <Analyzer Remove="@(_RazorAnalyzer)" Condition="'@(_QuarkGeneratedRazor)' != ''" />
+      <Compile Include="@(_QuarkGeneratedRazor)" />
+      <FileWrites Include="@(_QuarkGeneratedRazor);$(_QuarkValidationRazorDirectory)/sources.txt" />
       <Compile Include="$(_QuarkValidationOutput)" />
       <FileWrites Include="$(_QuarkValidationOutput);$(_QuarkValidationDirectory)*.txt" />
     </ItemGroup>
