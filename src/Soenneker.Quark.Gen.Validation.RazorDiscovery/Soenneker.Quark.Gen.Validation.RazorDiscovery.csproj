@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <!-- Launched separately with the consumer SDK's runtime, not loaded by the native executable. -->
+        <ShouldBeValidatedAsExecutableReference>false</ShouldBeValidatedAsExecutableReference>
         <!-- Run on the consumer SDK's compiler runtime, including SDK 10. -->
         <TargetFramework>net11.0</TargetFramework>
         <Nullable>enable</Nullable>
