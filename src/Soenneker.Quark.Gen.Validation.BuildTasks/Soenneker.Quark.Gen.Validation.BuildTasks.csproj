@@ -16,10 +16,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Soenneker.Utils.Process" Version="11.0.1613" />
-        <PackageReference Include="Soenneker.Utils.File" Version="11.0.2341" />
-        <PackageReference Include="Soenneker.Utils.Directory" Version="11.0.978" />
-        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="11.0.1516" />
+        <PackageReference Include="Soenneker.Utils.Process" Version="11.0.1614" />
+        <PackageReference Include="Soenneker.Utils.File" Version="11.0.2342" />
+        <PackageReference Include="Soenneker.Utils.Directory" Version="11.0.979" />
+        <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="11.0.1517" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="11.0.0" />
     </ItemGroup>
