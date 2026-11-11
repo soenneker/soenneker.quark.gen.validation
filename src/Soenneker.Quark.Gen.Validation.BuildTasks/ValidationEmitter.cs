@@ -98,6 +98,16 @@ public sealed class ValidationEmitter
                     var fieldIndex = 0;
                     foreach (IPropertySymbol property in properties) EmitProperty(ref output, type, property, properties, ref fields, ref fieldIndex, ref usesTypedRange, ref usesComparison);
                     output.AppendLine("default: throw new global::System.ArgumentException(\"Unknown public validation property: \" + memberName, nameof(memberName));\n}\n}");
+                    if (properties.Any(property => Attributes(property).Any(IsAsync)))
+                    {
+                        output.Append("bool global::Soenneker.Quark.IGeneratedQuarkValidation.HasAsyncValidation(string memberName) => memberName is ");
+                        output.Append(string.Join(" or ", properties.Where(property => Attributes(property).Any(IsAsync)).Select(property => Literal(property.Name))));
+                        output.AppendLine(";");
+                        output.AppendLine("async global::System.Threading.Tasks.ValueTask global::Soenneker.Quark.IGeneratedQuarkValidation.ValidateFieldAsync(string memberName, global::System.Collections.Generic.ICollection<global::System.ComponentModel.DataAnnotations.ValidationResult> results, global::System.IServiceProvider? serviceProvider, global::System.Threading.CancellationToken cancellationToken) {");
+                        output.AppendLine("cancellationToken.ThrowIfCancellationRequested(); switch (memberName) {");
+                        foreach (IPropertySymbol property in properties) EmitProperty(ref output, type, property, properties, ref fields, ref fieldIndex, ref usesTypedRange, ref usesComparison, asyncValidation: true);
+                        output.AppendLine("default: throw new global::System.ArgumentException(\"Unknown public validation property: \" + memberName, nameof(memberName));\n}\n}");
+                    }
                     output.Append(fields.AsSpan());
                     foreach (INamedTypeSymbol _ in chain) output.AppendLine("}");
                     if (!type.ContainingNamespace.IsGlobalNamespace) output.AppendLine("}");
@@ -112,6 +122,13 @@ public sealed class ValidationEmitter
             fields.Dispose();
             output.Dispose();
         }
+    }
+
+    private bool IsAsync(AttributeData attribute)
+    {
+        for (INamedTypeSymbol? type = attribute.AttributeClass; type is not null; type = type.BaseType)
+            if (Name(type) == _annotations + "AsyncValidationAttribute") return true;
+        return false;
     }
 
     private static IEnumerable<IPropertySymbol> Properties(INamedTypeSymbol type)
@@ -196,7 +213,7 @@ public sealed class ValidationEmitter
     }
 
     private void EmitProperty(ref PooledStringBuilder output, INamedTypeSymbol model, IPropertySymbol property, IPropertySymbol[] properties,
-        ref PooledStringBuilder fields, ref int fieldIndex, ref bool usesTypedRange, ref bool usesComparison)
+        ref PooledStringBuilder fields, ref int fieldIndex, ref bool usesTypedRange, ref bool usesComparison, bool asyncValidation = false)
     {
         ImmutableArray<AttributeData> allAttributes = Attributes(property);
         List<AttributeData>? attributes = null;
@@ -207,6 +224,12 @@ public sealed class ValidationEmitter
         output.Append("case ");
         output.Append(Literal(property.Name));
         output.AppendLine(": {");
+
+        if (!asyncValidation && allAttributes.Any(IsAsync))
+        {
+            output.AppendLine("throw new global::System.InvalidOperationException(\"This field has asynchronous annotations. Use ValidateFieldAsync.\"); }");
+            return;
+        }
 
         // Match TryValidateProperty: even a field without annotations reads its current getter.
         output.Append("var value = this.@");
@@ -228,7 +251,7 @@ public sealed class ValidationEmitter
             bool needsContext = attributes.Any(a => !CanCache(a, Name(a.AttributeClass!)) && Name(a.AttributeClass!) is not (_annotations + "CompareAttribute" or "Soenneker.Quark.QuarkCompareAttribute"));
             if (needsContext) output.AppendLine("global::System.ComponentModel.DataAnnotations.ValidationContext? context = null;");
             string errorDisplay = needsContext ? "(context?.DisplayName ?? " + displayExpression + ")" : displayExpression;
-            string? context = needsContext ? "(context ??= new global::System.ComponentModel.DataAnnotations.ValidationContext(this, " + displayExpression + ", null, null) { MemberName = " + Literal(property.Name) + " })" : null;
+            string? context = needsContext ? "(context ??= new global::System.ComponentModel.DataAnnotations.ValidationContext(this, " + displayExpression + (asyncValidation ? ", serviceProvider, null) { MemberName = " : ", null, null) { MemberName = ") + Literal(property.Name) + " })" : null;
             for (var i = 0; i < attributes.Count; i++)
             {
                 AttributeData attribute = attributes[i];
@@ -376,8 +399,13 @@ public sealed class ValidationEmitter
                 }
                 else
                 {
-                    output.Append("var "); output.Append(result); output.Append(" = "); output.Append(variable);
-                    output.Append(".GetValidationResult(value, "); output.Append(context); output.AppendLine(");");
+                    output.Append("var "); output.Append(result); output.Append(" = ");
+                    if (asyncValidation && IsAsync(attribute)) output.Append("await ");
+                    output.Append(variable);
+                    output.Append(asyncValidation && IsAsync(attribute) ? ".GetValidationResultAsync(value, " : ".GetValidationResult(value, ");
+                    output.Append(context);
+                    output.AppendLine(asyncValidation && IsAsync(attribute) ? ", cancellationToken);" : ");");
+                    if (asyncValidation && IsAsync(attribute)) output.AppendLine("cancellationToken.ThrowIfCancellationRequested();");
                     output.Append("if ("); output.Append(result); output.Append(" is not null) { results.Add("); output.Append(result);
                     output.Append(");"); output.Append(IsRequired(attribute) ? " return;" : ""); output.AppendLine(" }");
                 }

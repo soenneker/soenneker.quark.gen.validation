@@ -14,7 +14,11 @@ public sealed class ValidationParityTests
 {
     private const string Contract = """
 namespace Soenneker.Quark {
-public interface IGeneratedQuarkValidation { void ValidateField(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results); }
+public interface IGeneratedQuarkValidation {
+ void ValidateField(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results);
+ bool HasAsyncValidation(string memberName) => false;
+ System.Threading.Tasks.ValueTask ValidateFieldAsync(string memberName, System.Collections.Generic.ICollection<System.ComponentModel.DataAnnotations.ValidationResult> results, System.IServiceProvider? serviceProvider, System.Threading.CancellationToken cancellationToken) { ValidateField(memberName, results); return default; }
+}
 [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct)]
 public sealed class GenerateQuarkValidationAttribute : System.Attribute { }
 }
