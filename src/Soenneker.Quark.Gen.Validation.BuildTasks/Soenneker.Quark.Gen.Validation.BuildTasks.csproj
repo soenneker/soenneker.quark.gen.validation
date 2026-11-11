@@ -16,7 +16,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Soenneker.Utils.Process" Version="11.0.1613" />
+        <PackageReference Include="Soenneker.Utils.Process" Version="11.0.1614" />
         <PackageReference Include="Soenneker.Utils.File" Version="11.0.2341" />
         <PackageReference Include="Soenneker.Utils.Directory" Version="11.0.978" />
         <PackageReference Include="Soenneker.Extensions.Enumerable.String" Version="11.0.1516" />
