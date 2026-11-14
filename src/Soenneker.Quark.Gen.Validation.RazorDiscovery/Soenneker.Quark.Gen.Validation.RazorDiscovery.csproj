@@ -10,6 +10,6 @@
     </PropertyGroup>
     <ItemGroup>
         <!-- Compile against Roslyn 5.9; runtime assemblies come from the selected SDK. -->
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" PrivateAssets="all" ExcludeAssets="runtime" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" PrivateAssets="all" ExcludeAssets="runtime" />
     </ItemGroup>
 </Project>
